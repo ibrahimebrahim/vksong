@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -156,98 +157,78 @@ public class VkSong extends Activity implements OnClickListener, OnItemClickList
 		
 	}
 	
-	public static class DownloadService extends Service 
-	{
-		
-		String artist = song.artist;
-		String track = song.track;
-		Notification nf;
-		int nID;
-		
-		@Override
-	    public void onCreate()
-		{
-			Log.v("vklog", "downloading started");
-			String surl = song.url;
-			artist = song.artist;
-			track = song.track;
-			nf = notification;
-			nID = ID;
-			try
-			{
-				SharedPreferences pref = getSharedPreferences("VkSongSettings",0);
-				URL url = new URL(surl);
-				URLConnection con = url.openConnection();
-				
-				BufferedInputStream in =  new BufferedInputStream(con.getInputStream());
-				
-				String path = pref.getString("path", "")+"/";
-				File f = new File(path);
-				if (f.isDirectory())
-				{
-					Log.v("dlog", "Ok Dir");
-				} else 
-					if (!f.isFile()&&f.mkdirs())
-					{
-						Log.v("dlog", "Create Dir");
-					}
-				
-				int len = con.getContentLength();
-				int size = 0;
-				
-				FileOutputStream out =  new FileOutputStream(path + artist + " - "+ track + ".mp3"); 
-				
-				int i = 0;
-				int oldps = 0;
-				byte[] bytesIn = new byte[1024];
-				
-				Log.v("dlog", "Downloading...");
-				mNM.notify(ID, notification);
-				while ((i = in.read(bytesIn)) >= 0)
-			    {
-					out.write(bytesIn, 0, i);
-					size += i;
-					double ps = size/((double)len/100.0);
-					if (oldps != (int)ps)
-					{
-						String format = String.format("%d", (int)ps);
-						Log.v("dlog", format+"%");
-						nf.setLatestEventInfo(ac, artist + " - " + track , format+"%", contentIntent);
-						mNM.notify(nID,nf);
-					}
-					oldps = (int)ps;
-			    }
-			    out.close();
-			    in.close();
-			    Log.v("dlog", "OK");
-			}
-			catch (Exception e)
-			{
-				Log.v("dlog","Error:" + e.getMessage());
-				mNM.cancel(nID);
-				errorMessage = e.getMessage();
-			}
-		}
-
-		@Override
-		public IBinder onBind(Intent arg0)
-		{
-			// TODO Auto-generated method stub
-			return null;
-		}
-		
-	}
-	
 	public class DownloadFileTask extends AsyncTask<Void, Void, Void>
-	{
-		Context context;
-		Intent intent;
+	{	
+		String artist = song.artist;
+        String track = song.track;
+        Notification nf;
+        int nID;
+		
 		@Override
 		protected Void doInBackground(Void... arg0) 
 		{
-			context = getBaseContext();
-			intent = new Intent(context, DownloadService.class);
-			context.startService(intent);
+			Log.v("dlog", "doInBackground");
+			String surl = song.url;
+            artist = song.artist;
+            track = song.track;
+            nf = notification;
+            nID = ID;
+            try
+            {
+                    SharedPreferences pref = getSharedPreferences("VkSongSettings",0);
+                    URL url = new URL(surl);
+                    URLConnection con = url.openConnection();
+                    //con.setReadTimeout(5000);
+                    
+                    BufferedInputStream in =  new BufferedInputStream(con.getInputStream());
+                    
+                    String path = pref.getString("path", "")+"/";
+                    //String path = "/storage/mp3/";
+                    File f = new File(path);
+                    if (f.isDirectory())
+                    {
+                            Log.v("dlog", "Ok Dir");
+                    } else 
+                            if (!f.isFile()&&f.mkdirs())
+                            {
+                                    Log.v("dlog", "Create Dir");
+                            }
+                    
+                    int len = con.getContentLength();
+                    int size = 0;
+                    
+                    FileOutputStream out =  new FileOutputStream(path + artist + " - "+ track + ".mp3"); 
+                    
+                    int i = 0;
+                    int oldps = 0;
+                    byte[] bytesIn = new byte[1024];
+                    
+                    Log.v("dlog", "Downloading... "+surl);
+                    mNM.notify(ID, notification);
+                    while ((i = in.read(bytesIn)) >= 0)
+                {
+                            out.write(bytesIn, 0, i);
+                            size += i;
+                            double ps = size/((double)len/100.0);
+                            if (oldps != (int)ps)
+                            {
+                                    String format = String.format("%d", (int)ps);
+                                    Log.v("dlog", "done"+format+"%");
+                                    nf.setLatestEventInfo(ac, artist + " - " + track , format+"%", contentIntent);
+                                    mNM.notify(nID,nf);
+                            }
+                            oldps = (int)ps;
+                }
+                out.close();
+                in.close();
+                Log.v("dlog", "all OK");
+            }
+            catch (Exception e)
+            {
+                    Log.v("dlog","Error:" + e.getMessage());
+                    mNM.cancel(nID);
+                    errorMessage = e.getMessage();
+            }
 			
 			return null;
 			
@@ -256,12 +237,12 @@ public class VkSong extends Activity implements OnClickListener, OnItemClickList
 		@Override
 		protected void onPostExecute(Void result) 
 	    {
-			
-			context.stopService(intent);
+			Log.v("dlog","onPostExecute");
+			//context.stopService(intent);
 			if (errorMessage == "") 
 				Toast.makeText(ac, "Downloading done", Toast.LENGTH_LONG).show();
 			callError();
-			//mNM.cancel(ID);й
+			mNM.cancel(ID);
 	    }
 	}
 	
@@ -271,6 +252,16 @@ public class VkSong extends Activity implements OnClickListener, OnItemClickList
     {
     	Log.v("vklog", "=======================");
     	Log.v("vklog", "Create Activity");
+    	final SharedPreferences pref = getSharedPreferences("VkSongSettings",0);
+    	boolean isFirstStart = pref.getBoolean("isFirstStart", true);
+    	if (isFirstStart)
+    	{
+    		SharedPreferences.Editor editor = pref.edit();
+    		editor.putBoolean("isFirstStart", false);
+    		editor.commit();
+    		Intent i = new Intent(VkSong.this, Preferences.class);
+    		startActivity(i);
+    	}
     	
     	errorDialog = new AlertDialog.Builder(VkSong.this).create();
     	
@@ -302,21 +293,28 @@ public class VkSong extends Activity implements OnClickListener, OnItemClickList
       	ac = getApplicationContext();
 		
 		AlertDialog alertDialog = new AlertDialog.Builder(VkSong.this).create();
-		alertDialog.setTitle("Download song?");
+		alertDialog.setTitle("Play or download this song?");
 		alertDialog.setMessage(vk.artist + " - " + vk.track);
 		
-		alertDialog.setButton("OK", new DialogInterface.OnClickListener() {
+		alertDialog.setButton("Play", new DialogInterface.OnClickListener() {
 		      public void onClick(DialogInterface dialog, int which) {
-		    	  
-		    	DownloadFileTask dft = new DownloadFileTask();
-		  		
-		      	mNM = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-		      	notification = new Notification(R.drawable.icon, "Downloading " + song.artist + " - " + song.track, System.currentTimeMillis());
-		      	notification.setLatestEventInfo(ac, song.artist + " - " + song.track, "0%", contentIntent);
-		      	ID++;    
-		  		dft.execute(null);
+		    	Intent playIntent = new Intent("android.intent.action.VIEW", Uri.parse(song.url));
+		    	startActivity(playIntent);
 		} });
 		
+		alertDialog.setButton3("Download", new DialogInterface.OnClickListener() {
+		      public void onClick(DialogInterface dialog, int which) {
+		    	  
+			    	DownloadFileTask dft = new DownloadFileTask();
+			  		
+			      	mNM = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+			      	notification = new Notification(R.drawable.icon, "Downloading " + song.artist + " - " + song.track, System.currentTimeMillis());
+			      	notification.setLatestEventInfo(ac, song.artist + " - " + song.track, "0%", contentIntent);
+			      	notification.flags = Notification.FLAG_ONGOING_EVENT;
+			      	ID++;   
+			        Toast.makeText(ac, "Start downloading", Toast.LENGTH_LONG).show();
+			  		dft.execute(null);
+			} });
 		
 		alertDialog.setButton2("Cancel", new DialogInterface.OnClickListener() {
 		      public void onClick(DialogInterface dialog, int which) {
@@ -324,7 +322,7 @@ public class VkSong extends Activity implements OnClickListener, OnItemClickList
 		      }
 		});
 		alertDialog.show();
-		Log.v("dlog", "errors2");
+		//Log.v("dlog", "");
     }
     
     public void onClick(View v) 
